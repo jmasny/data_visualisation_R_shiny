@@ -1,0 +1,126 @@
+---
+title: "Raport - Kursy walut"
+date: "`r Sys.Date()`"
+output: html_document
+params:
+  mamona_one: NA
+  mamona_two: NA
+  dejta: NA
+---
+
+### Tabela interaktywna
+```{r echo=FALSE, comment=NA}
+library(DT)
+DT::datatable(params$dejta, 
+            rownames = FALSE,
+            options = list(
+                scrollX = TRUE,
+                pageLength = 30,
+                lengthMenu = seq(from=10,by=10,to=100)
+            )
+)
+```
+### Analiza
+
+#### Rozpatrywane waluty
+
+* Waluta pierwsza: `r toString(params$mamona_one)`
+* Waluta druga: `r toString(params$mamona_two)`
+
+
+### Mapa
+```{r results='asis', tidy=FALSE, echo=FALSE}
+# nie dziala
+library(googleVis)
+op <- options(gvis.plot.tag = 'chart')
+
+# iso_3166-1_alpha-2
+        countries <- data.frame(
+            country = c("Andorra", "Australia", "Austria", "Belgium", "Brazil",
+                        "Bulgaria", "Canada", "Chile", "China", "Croatia",
+                        "Cyprus", "Czechia", "Denmark", "United Kingdom", "Estonia",
+                        "Finland", "France", "Germany", "Grecce", "Hong Kong",
+                        "Hungary", "Iceland", "India", "ID", "Ireland",
+                        "Israel", "Italy", "Japan", "Latvia",
+                        "Lithuania", "Luxemburg", "Malaysia", "Malta", "Mexico",
+                        "Monaco", "Montenegro", "Netherlands", "New Zealand",
+                        "Norway", "Philipines", "Portugal", "Romania",
+                        "South Africa","RU", "Singapore", "Slovakia",
+                        "Slovenia", "KR", "Spain", "Sweden", "Switzerland",
+                        "Thailand", "Turkey", "Ukraine", "United States",
+                        "WO"),
+            
+            currency = c("1EUR", "1AUD", "1EUR", "1EUR", "1BRL", "1BGN", "1CAD",
+                         "100CLP", "1CNY", "1HRK", "1EUR", "1CZK", "1DKK",
+                         "1GBP", "1EUR", "1EUR", "1EUR", "1EUR", "1EUR", "1HKD",
+                         "100HUF", "100ISK", "100INR", "1000IDR", "1EUR",
+                         "1ILS", "1EUR", "100JPY", "1EUR", "1EUR",
+                         "1EUR", "1MYR", "1EUR", "1MXN", "1EUR", "1EUR", "1EUR",
+                         "1NZD", "1NOK", "1PHP", "1EUR", "1RON", "1ZAR", "1RUB",
+                         "1SGD", "1EUR", "1EUR", "100KRW", "1EUR", "1SEK",
+                         "1CHF", "1THB", "1TRY", "1UAH", "1USD", "1XDR")
+        )
+        
+abc <- data.frame(countries)
+if (!params$mamona_one == "1XDR" & !params$mamona_two == "1XDR"){
+  abc <- filter(countries, currency %in% c(params$mamona_one, params$mamona_two))
+}
+        
+GC <- gvisGeoChart(abc, locationvar="country", colorvar="currency",
+             options=list(width=650, height=650))
+print(GC, "chart")
+```
+
+### Szeregi czasowe kursów
+```{r echo=FALSE, comment=NA}
+tmp <- data.frame(params$dejta)
+        
+currencyOne <- params$mamona_one
+currencyTwo <- params$mamona_two
+one <- paste('X',currencyOne,sep="")
+two <- paste('X',currencyTwo,sep="")
+        
+abc <- select(tmp, 'data', one, two)
+
+ggplot(abc, aes(x=data)) + geom_line(aes(y=get(one), colour=one)) + geom_line(aes(y=get(two), colour=two)) + scale_color_manual(name="Waluta", breaks=c(one, two), values=c('red', 'blue')) + xlab("Data") + ylab("Kurs waluty obcej wzgledem PLN") + ggtitle("Kursy walut obcych wzgledem PLN w czasie")
+```
+
+### Histogram różnic kursów
+```{r echo=FALSE, comment=NA}
+tmp <- data.frame(params$dejta)
+        
+currencyOne <- params$mamona_one
+currencyTwo <- params$mamona_two
+one <- paste('X',currencyOne,sep="")
+two <- paste('X',currencyTwo,sep="")
+        
+abc <- select(tmp, 'data', one, two)
+        
+# jesli wybrana zostala ta sama waluta to uzyj do roznicy tej samej
+if (one == two) {
+  colnames(abc)[2] <- "ONE"
+  abc$diff <- abc$ONE - abc$ONE
+} else {
+  colnames(abc)[2] <- "ONE"
+  colnames(abc)[3] <- "TWO"
+  abc$diff <- abc$ONE - abc$TWO
+}
+
+ggplot(abc, aes(x=diff)) + geom_histogram(bins=50) + xlab("Różnica") + ylab("Liczność") + ggtitle("Histogram różnicy kursów obu walut")
+```
+
+### Regresja liniowa
+```{r echo=FALSE, comment=NA}
+tmp <- data.frame(params$dejta)
+        
+currencyOne <- params$mamona_one
+currencyTwo <- params$mamona_two
+one <- paste('X',currencyOne,sep="")
+two <- paste('X',currencyTwo,sep="")
+        
+abc <- select(tmp, 'data', one, two)
+model <- lm(as.numeric(abc[[one]])~as.numeric(abc[[two]]), data=abc)
+summary(model)
+raintest(model)
+ggplot(abc, aes(x = get(one), y = get(two))) + geom_point(colour="black") + stat_smooth(method = "lm", colour="red") + ylab(one) + xlab(two)
+```
